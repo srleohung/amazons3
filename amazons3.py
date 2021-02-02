@@ -45,7 +45,7 @@ class AmazonS3():
         return response['Buckets']
         
     # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-uploading-files.html
-    def upload_file(self, file_name, bucket, object_name=None, extra_args=None):
+    def upload_file(self, file_name, bucket, object_name=None, extra_args=None, callback=None):
         """Upload a file to an S3 bucket
 
         :param file_name: File to upload
@@ -59,13 +59,13 @@ class AmazonS3():
             object_name = file_name
 
         try:
-            response = self.s3_client.upload_file(file_name, bucket, object_name, ExtraArgs=extra_args)
+            response = self.s3_client.upload_file(file_name, bucket, object_name, ExtraArgs=extra_args, Callback=callback)
         except ClientError as e:
             logging.error(e)
             return False
         return True
 
-    def upload_fileobj(self, fileobj, bucket, object_name, extra_args=None):
+    def upload_fileobj(self, fileobj, bucket, object_name, extra_args=None, callback=None):
         """Upload a file to an S3 bucket
 
         :param fileobj: File stream to upload
@@ -75,15 +75,30 @@ class AmazonS3():
         """
 
         try:
-            response = self.s3_client.upload_fileobj(fileobj, bucket, object_name, ExtraArgs=extra_args)
+            response = self.s3_client.upload_fileobj(fileobj, bucket, object_name, ExtraArgs=extra_args, Callback=callback)
         except ClientError as e:
             logging.error(e)
             return False
         return True
     
+    def extra_metadata(self, metadata, args=None):
+        if args is None:
+            args = {'Metadata': metadata}
+        else:
+            args['Metadata'] = metadata
+        return args
+
     def extra_public_read(self, args=None):
         if args is None:
             args = {'ACL': 'public-read'}
         else:
             args['ACL'] = 'public-read'
+        return args
+    
+    def extra_grant(self, grant_read, grant_full_control, args=None):
+        if args is None:
+            args = {'GrantRead': grant_read, 'GrantFullControl': grant_full_control}
+        else:
+            args['GrantRead'] = grant_read
+            args['GrantFullControl'] = grant_full_control
         return args
