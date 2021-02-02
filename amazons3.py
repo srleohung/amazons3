@@ -102,3 +102,14 @@ class AmazonS3():
             args['GrantRead'] = grant_read
             args['GrantFullControl'] = grant_full_control
         return args
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-download-file.html
+    def download_file(self, bucket, object_name, file_name=None):
+        # If S3 object_name was not specified, use file_name
+        if file_name is None:
+            file_name = object_name
+
+        return self.s3_client.download_file(bucket, object_name, file_name)
+
+    def download_fileobj(self, bucket, object_name, fileobj):
+        return self.s3_client.download_file(bucket, object_name, fileobj)
