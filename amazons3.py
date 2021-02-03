@@ -2,14 +2,14 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 from boto3.s3.transfer import TransferConfig
-
+import json
 class AmazonS3():
-    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, config=TransferConfig()):
+    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region_name=None, config=TransferConfig(), endpoint_url=None):
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.region_name = region_name
         self.config = config
-        self.s3_client = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name=region_name)
+        self.s3_client = boto3.client('s3', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name=region_name, endpoint_url=endpoint_url)
     
     # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-creating-buckets.html
     def create_bucket(self, bucket_name):
@@ -124,11 +124,12 @@ class AmazonS3():
         return self.s3_client.download_file(bucket, object_name, fileobj, Config=config)
 
     # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3.html
-    def transfer_config(self, multipart_threshold=None, max_concurrency=None, use_threads=None, forever=False):
-        config = TransferConfig(multipart_threshold=multipart_threshold, max_concurrency=max_concurrency, use_threads=use_threads)
-        if forever is True:
-            self.config = config
-        return config
+    def put_transfer_config(self, multipart_threshold=None, max_concurrency=None, use_threads=None):
+        self.config = TransferConfig(multipart_threshold=multipart_threshold, max_concurrency=max_concurrency, use_threads=use_threads)
+        return True
+    
+    def get_transfer_config(self, multipart_threshold=None, max_concurrency=None, use_threads=None):
+        return TransferConfig(multipart_threshold=multipart_threshold, max_concurrency=max_concurrency, use_threads=use_threads)
 
     # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-presigned-urls.html
     def create_presigned_url(self, bucket_name, object_name, expiration=3600):
@@ -205,3 +206,98 @@ class AmazonS3():
 
         # The response contains the presigned URL and required fields
         return response
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-bucket-policies.html
+    def get_bucket_policy(self, bucket_name):
+        # Retrieve the policy of the specified bucket
+        result = self.s3_client.get_bucket_policy(Bucket=bucket_name)
+        return result['Policy']
+    
+    def put_bucket_policy(self, bucket_name, bucket_policy):
+        # Create a bucket policy
+        # bucket_name = 'BUCKET_NAME'
+        # bucket_policy = {
+        #     'Version': '2012-10-17',
+        #     'Statement': [{
+        #         'Sid': 'AddPerm',
+        #         'Effect': 'Allow',
+        #         'Principal': '*',
+        #         'Action': ['s3:GetObject'],
+        #         'Resource': f'arn:aws:s3:::{bucket_name}/*'
+        #     }]
+        # }
+
+        # Convert the policy from JSON dict to string
+        bucket_policy = json.dumps(bucket_policy)
+
+        # Set the new policy
+        self.s3_client.put_bucket_policy(Bucket=bucket_name, Policy=bucket_policy)
+        return True
+
+    def delete_bucket_policy(self, bucket_name):
+        # Delete a bucket's policy
+        self.s3_client.delete_bucket_policy(Bucket=bucket_name)
+        return True
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-access-permissions.html
+    def get_bucket_acl(self, bucket_name):
+        # Retrieve a bucket's ACL
+        return self.s3_client.get_bucket_acl(Bucket=bucket_name)
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-static-web-host.html
+    def get_bucket_website(self, bucket_name):
+        # Retrieve the website configuration
+        return self.s3_client.get_bucket_website(Bucket=bucket_name)
+
+    def put_bucket_website(self, bucket_name, website_configuration):
+        # Define the website configuration
+        # website_configuration = {
+        #     'ErrorDocument': {'Key': 'error.html'},
+        #     'IndexDocument': {'Suffix': 'index.html'},
+        # }
+
+        # Set the website configuration
+        self.s3_client.put_bucket_website(Bucket=bucket_name, WebsiteConfiguration=website_configuration)
+        return True
+    
+    def delete_bucket_website(self, bucket_name):
+        # Delete the website configuration
+        return self.s3_client.delete_bucket_website(Bucket=bucket_name)
+
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-example-configuring-buckets.html
+    def get_bucket_cors(self, bucket_name):
+        """Retrieve the CORS configuration rules of an Amazon S3 bucket
+
+        :param bucket_name: string
+        :return: List of the bucket's CORS configuration rules. If no CORS
+        configuration exists, return empty list. If error, return None.
+        """
+
+        # Retrieve the CORS configuration
+        try:
+            response = self.s3_client.get_bucket_cors(Bucket=bucket_name)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchCORSConfiguration':
+                return []
+            else:
+                # AllAccessDisabled error == bucket not found
+                logging.error(e)
+                return None
+        return response['CORSRules']
+
+    def put_bucket_cors(self, bucket_name, cors_configuration):
+        # Define the configuration rules
+        # cors_configuration = {
+        #     'CORSRules': [{
+        #         'AllowedHeaders': ['Authorization'],
+        #         'AllowedMethods': ['GET', 'PUT'],
+        #         'AllowedOrigins': ['*'],
+        #         'ExposeHeaders': ['GET', 'PUT'],
+        #         'MaxAgeSeconds': 3000
+        #     }]
+        # }
+
+        # Set the CORS configuration
+        self.s3_client.put_bucket_cors(Bucket=bucket_name, CORSConfiguration=cors_configuration)
+        return True
+    
